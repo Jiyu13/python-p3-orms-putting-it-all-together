@@ -122,12 +122,12 @@ class Dog:
             new_dog = cls.create(name, breed) # save new dog into db
             return new_dog                    # return new_dog
 
-    def update(self):
-        '''contains a method "update()" that updates an instance's corresponding database record to match its new attribute values.'''
-        sql = """
-            update dogs
-            set name = ?, breed = ?
-            where id = ?
-        """
-        updated_dog = CURSOR.execute(sql, (self.name, self.breed, self.id))
-        return updated_dog
+    # def update(self):
+    #     '''contains a method "update()" that updates an instance's corresponding database record to match its new attribute values.'''
+    #     sql = """
+    #         update dogs
+    #         set name = ?, breed = ?
+    #         where id = ?
+    #     """
+    #     updated_dog = CURSOR.execute(sql, (self.name, self.breed, self.id))
+    #     return updated_dog
