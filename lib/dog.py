@@ -1,133 +1,166 @@
 import sqlite3
 
-CONN = sqlite3.connect('lib/dogs.db')
+CONN = sqlite3.connect('dogs.db')
 CURSOR = CONN.cursor()
 
 class Dog:
-
-    all = []
     
-
     def __init__(self, name, breed, id=None):
-        '''initializes with name and breed attributes, and id attribute'''
-        self.id = id
+        '''initializes with name and breed attributes.'''
         self.name = name
         self.breed = breed
-    
+        self.id = id
+
 
     @classmethod
     def create_table(cls):
-        '''contains method "create_table()" that creates table "dogs" if it does not exist.'''
-        sql = """
+        '''
+            contains method "create_table()" that creates table "dogs" if it does not exist.
+            set self.id = None
+        '''
+        query = """
             create table if not exists dogs (
                 id integer primary key,
                 name text,
                 breed text
             )
         """
-        CURSOR.execute(sql)
+        CURSOR.execute(query)
+        CONN.commit()
 
-    
+
     @classmethod
     def drop_table(cls):
         '''contains method "drop_table()" that drops table "dogs" if it exists.'''
-        sql = """
+        query = """
             drop table if exists dogs
-
         """
-        CURSOR.execute(sql)
+        CURSOR.execute(query)
+        CONN.commit()
 
-    
-    
+
     def save(self):
-        '''contains method "save()" that saves/insert a Dog instance to the database.'''
-        sql = """
+        '''contains method "save()" that saves a Dog instance to the database.'''
+        query = """
             insert into dogs (name, breed)
             values (?, ?)
         """
-        CURSOR.execute(sql, (self.name, self.breed))
-
-        # find the matched row in db with name = self.name
-        # self.id = CURSOR.execute("select dogs.id from dogs where dogs.name = ? ", (self.name,)).fetchone()[0]
-        
-        # returns the last inserted rowid
+        CURSOR.execute(query, (self.name, self.breed))
         self.id = CURSOR.lastrowid
+        CONN.commit()
 
-
+    
+    
     @classmethod
     def create(cls, name, breed):
         '''contains method "create()" that creates a new row in the database and returns a Dog instance.'''
-        # dog = Dog.create("name", "breed")
-        dog = cls(name, breed)      # create new instance
-        dog.save()                  # save the new instance into db by calling save() which inserts the instance to db
-        return dog
+        new_dog = Dog(name, breed)
+        new_dog.save()
+        return new_dog
 
-    
+
     @classmethod
     def new_from_db(cls, row):
         '''contains method "new_from_db()" that takes a database row and creates a Dog instance.'''
-        dog = cls(row[1], row[2])      # song = Song(row[1], row[2])
-        dog.id = row[0]
-        return dog
+        dog_from_db = cls(
+            id=row[0],
+            name=row[1],
+            breed=row[2]
+        )
 
+        return dog_from_db
+        # if not set id=None => def __init__(self, name, breed)
+
+
+        # dog = cls(row[1], row[2])
+        # dog.id = row[0]
+        # return dog
+        
+    
 
     @classmethod
     def get_all(cls):
-        '''contains method "get_all()" that returns a list of Dog instances for every record in the database.'''
-        
-        sql = """
+         '''contains method "get_all()" that returns a list of Dog instances for every record in the database.'''
+         query = """
             select * from dogs
-        """
-        all = CURSOR.execute(sql).fetchall()    # fetch all rows in db, save it to all variable
-        cls.all = [cls.new_from_db(row) for row in all] # convert each row get back from db into python obj using new_from_db(), assgin the results to class attr "all"
-        return cls.all
+         """
 
+         all_rows = CURSOR.execute(query).fetchall()
+         
+         return [cls.new_from_db(row) for row in all_rows]
     
+
     @classmethod
     def find_by_name(cls, name):
         '''contains method "find_by_name()" that returns a Dog instance corresponding to its database record retrieved by name.'''
-        
-        sql = """
+        query = """
             select * from dogs where name = ? limit 1
         """
-        dog = CURSOR.execute(sql, (name,)).fetchone()
-        return cls.new_from_db(dog)
 
+        find_row = CURSOR.execute(query, (name,)).fetchone()
+        if find_row:
+            return cls.new_from_db(find_row)
+        else: 
+            return None
 
+    
     @classmethod
     def find_by_id(cls, id):
         '''contains method "find_by_id()" that returns a Dog instance corresponding to its database record retrieved by id.'''
-        
-        sql = """
-            select * from dogs where id = ? 
+
+        query = """
+            select * from dogs where id = ? limit 1
         """
 
-        dog = CURSOR.execute(sql, (id,)).fetchone()
-
-        return cls.new_from_db(dog)
-
+        find_row = CURSOR.execute(query, (id,)).fetchone()
+        if find_row:
+            return cls.new_from_db(find_row)
+        else:
+            return None
+    
 
     @classmethod
     def find_or_create_by(cls, name, breed):
-        '''contains method "find_or_create_by()" that takes a name and a breed as arguments and creates a Dog instance matching that record if it does not exist.'''
+        '''
+            contains method "find_or_create_by()" that takes a name and a breed as arguments and creates a Dog instance matching that record if it does not exist.
+            # select * from dogs where (name, breed) = (?, ?) limit 1
+        '''    
         
-        sql = """
-            select * from dogs where name = ? and breed = ?
+        query = """
+            select * from dogs where name = ? and breed = ? limit 1
+        """
+        find_row = CURSOR.execute(query, (name, breed)).fetchone()
+
+        if find_row:
+            return cls.new_from_db(find_row)
+        else:
+            # automatically create new row and instance if not in db
+            print("not found!")
+            return cls.create(name, breed)
+            
+            # answer from lecture, not persist to db
+            # query = """
+            #     insert into dogs (name, breed)
+            #     values (?, ?)
+            # """
+            # CURSOR.execute(query, (name, breed))
+            # return cls.find_by_name(name)
+
+
+
+    def update(self):
+        query = """
+            update dogs
+            set name = ?, breed = ? where id = ?
         """
 
-        dog = CURSOR.execute(sql, (name, breed)).fetchone()
-        if dog:
-            return cls.new_from_db(dog)         # convert that row into python obj
-        else:
-            new_dog = cls.create(name, breed) # save new dog into db
-            return new_dog                    # return new_dog
+        CURSOR.execute(query, (self.name, self.breed, self.id))
+        
+        # commit() to make the update persist in db
+        CONN.commit()
 
-    # def update(self):
-    #     '''contains a method "update()" that updates an instance's corresponding database record to match its new attribute values.'''
-    #     sql = """
-    #         update dogs
-    #         set name = ?, breed = ?
-    #         where id = ?
-    #     """
-    #     updated_dog = CURSOR.execute(sql, (self.name, self.breed, self.id))
-    #     return updated_dog
+        #  dog = Dog.find_by_name/id()
+        #  change dog.name/id = ""
+        #  dog.update()
+
+    
